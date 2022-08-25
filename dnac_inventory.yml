@@ -1,0 +1,57 @@
+---
+- name: DNA Center Inventory
+  hosts: all
+  collections:
+    - ansible.controller
+    - cisco.dnac
+  vars:
+    delete_missing_devices: true
+    inventory_name: My Inventory
+    organization_name: Default
+  tasks:
+    - name: Get Network Devices
+      cisco.dnac.network_device_info:
+        dnac_host: "{{ dnac_host }}"
+        dnac_username: "{{ dnac_username }}"
+        dnac_password: "{{ dnac_password }}"
+        dnac_verify: "{{ dnac_verify }}"
+        dnac_port: "{{ dnac_port }}"
+        dnac_version: "{{ dnac_version }}"
+        dnac_debug: "{{ dnac_debug }}"
+      register: network_devices_result
+
+    - name: Ensure inventory exists
+      ansible.controller.inventory:
+        name: "{{ inventory_name }}"
+        organization: "{{ organization_name }}"
+        state: present
+      register: controller_inventory
+
+    - name: Delete missing hosts from network_devices_result if selected
+      block:
+        - name: Gather all hosts in inventory
+          set_fact:
+            inv_hosts:  >-
+              {{ query(
+                  'awx.awx.controller_api',
+                  'hosts',
+                  query_params={ 'inventory__exact' : controller_inventory.id, },
+                ) | map(attribute='name') | list }}
+        
+        - name: Remove host from Controller if it is not in network_devices_result
+          ansible.controller.host:
+            name: "{{ item.name }}"
+            inventory: "{{ inventory_name }}"
+            state: absent
+          when: item.name not in network_devices_result|map(attribute="name")|list
+          loop: "{{ inv_hosts }}"
+      when: delete_missing_devices == true
+
+    - name: Add all items from network_devices_result to Controller Inventory
+      ansible.controller.host:
+        name: "{{ item.name }}"
+        inventory: "{{ inventory_name }}"
+        state: present
+        variables:
+          location: "{{ item.location }}"
+      loop: "{{ network_devices_result }}"
