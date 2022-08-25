@@ -43,7 +43,7 @@
             name: "{{ item.name }}"
             inventory: "{{ inventory_name }}"
             state: absent
-          when: item.name not in network_devices_result|map(attribute="name")|list
+          when: item.name not in network_devices_result.dnac_response|map(attribute="name")|list
           loop: "{{ inv_hosts }}"
       when: delete_missing_devices == true
 
@@ -54,4 +54,4 @@
         state: present
         variables:
           location: "{{ item.location }}"
-      loop: "{{ network_devices_result }}"
+      loop: "{{ network_devices_result.dnac_response }}"
