@@ -33,7 +33,7 @@
           set_fact:
             inv_hosts:  >-
               {{ query(
-                  'awx.awx.controller_api',
+                  'ansible.controller.controller_api',
                   'hosts',
                   query_params={ 'inventory__exact' : controller_inventory.id, },
                 ) | map(attribute='name') | list }}
