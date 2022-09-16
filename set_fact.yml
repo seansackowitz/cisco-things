@@ -1,0 +1,3 @@
+set_fact:
+  network_devices: "{{ network_devices | default([]) }} {% for response in item.dnac_response.response %} + {{ response }} {% endfor %}"
+loop: network_devices_result.results
