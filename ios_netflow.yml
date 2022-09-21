@@ -1,0 +1,11 @@
+---
+- name: Update Netflow cache
+  hosts: all
+  connection: network_cli
+  become: yes
+  # vars:
+  #   cache_size: 12288
+  #   interface_monitor_name: TEST_NETFLOW_MONITOR
+  #   save_to_startup: true
+  roles:
+    - netflow_cache

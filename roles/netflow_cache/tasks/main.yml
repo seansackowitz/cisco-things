@@ -1,0 +1,7 @@
+- name: NXOS
+  ansible.builtin.include_tasks: nxos.yml
+  when: ansible_network_os == 'cisco.nxos.nxos'
+
+- name: IOS
+  ansible.builtin.include_tasks: ios.yml
+  when: ansible_network_os == 'cisco.ios.ios'

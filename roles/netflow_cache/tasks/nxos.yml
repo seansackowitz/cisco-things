@@ -1,0 +1,53 @@
+- name: Gather facts
+  cisco.nxos.nxos_facts:
+    gather_subset: all
+
+- name: Check current cache size
+  cisco.nxos.nxos_command:
+    commands: show flow monitor {{ interface_monitor_name }} statistics | in Cache size
+  register: flow_cache_output
+
+- set_fact:
+    current_cache_size: "{{ flow_cache_output.stdout[0] | regex_search('(\\d+)', '\\1') | first }}"
+
+- name: Update cache setting if required
+  block:
+    - name: Loop over all interfaces for netflow input
+      cisco.nxos.nxos_command:
+        commands: show running-config interface {{ item.key }} | in {{ interface_monitor_name }}
+      loop: "{{ ansible_net_interfaces | dict2items }}"
+      register: running_interface_flow_config
+
+    - name: Group interfaces and input/output lines
+      set_fact:
+        interface_monitor_commands: "{{ interface_monitor_commands | default([]) }} + [ {% for command in item.stdout_lines[0] %}{'interface_name': '{{ item.item.key }}', 'netflow_command': '{{ command }}'}{{ ',' if not loop.last else '' }}{% endfor %} ]"
+      when: item.stdout_lines[0][0] | length > 0
+      loop: "{{ running_interface_flow_config.results }}"
+
+    - name: Display all interface and config pairs
+      debug:
+        var: interface_monitor_commands
+
+    - name: No all interface_monitor_commands
+      cisco.nxos.nxos_config:
+        lines: no {{ item.netflow_command }}
+        parents: interface {{ item.interface_name }}
+      loop: "{{ interface_monitor_commands }}"
+
+    - name: Update cache size
+      cisco.nxos.nxos_config:
+        lines: cache entries {{ cache_size }}
+        parents: flow monitor {{ interface_monitor_name }}
+
+  always:
+    - name: Restore all interface_monitor_commands
+      cisco.nxos.nxos_config:
+        lines: "{{ item.netflow_command }}"
+        parents: interface {{ item.interface_name }}
+      loop: "{{ interface_monitor_commands }}"
+
+    - name: Save running to startup
+      cisco.nxos.nxos_config:
+        save_when: always
+      when: save_to_startup
+  when: (current_cache_size | int) != (cache_size | int)
