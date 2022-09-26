@@ -1,0 +1,10 @@
+ip access-list extended MYLIST<-AL
+remark --- ICMP RESPONSE ---
+permit icmp 10.0.0.0 0.255.255.255 any echo-reply
+remark --- DHCP ---
+permit udp any host 255.255.255.255 eq bootps
+permit tcp 10.0.0.0 0.255.255.255 host 10.0.0.1 established
+
+deny ip any any log
+
+ip access-list resequence MYLIST<-AL 5 5

@@ -1,0 +1,7 @@
+---
+- name: Update cisco acl
+  hosts: all
+  connection: network_cli
+  become: yes
+  roles:
+    - cisco_acl

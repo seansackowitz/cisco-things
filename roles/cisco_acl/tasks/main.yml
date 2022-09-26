@@ -1,0 +1,10 @@
+- name: Clear acl
+  cisco.ios.ios_config:
+    lines:
+      - no ip access-list extended MYLIST<-AL
+    save_when: always
+
+- name: Update all acls
+  cisco.ios.ios_config:
+    src: acl.j2
+    save_when: always
