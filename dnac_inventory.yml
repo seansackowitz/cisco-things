@@ -1,57 +1,53 @@
 ---
-- name: DNA Center Inventory
-  hosts: all
-  collections:
-    - ansible.controller
-    - cisco.dnac
+- hosts: all
+  connection: local
   vars:
-    delete_missing_devices: true
-    inventory_name: My Inventory
+    inventory_name: test
     organization_name: Default
+    network_devices:
+      - hostname: DACS01M-2.asdfasdf.com
+        ansible_os: zxc
+        softwareType: IOS-XE
+        id: 1234-2
+      - hostname: DANK02M-3.asdfasdf.com
+        ansible_os: qwe
+        softwareType: IOS-XE
+        id: 1234-3
+      - hostname: DECS03M-4.asdfasdf.com
+        ansible_os: asd
+        softwareType: IOS-XE
+        id: 1234-4
+      - hostname: DBOL04M-5.asdfasdf.com
+        ansible_os: asd
+        softwareType: NX-OS
+        id: 1234-5
+      - hostname: DRDU05M-6.asdfasdf.com
+        id: 1234-6
+        softwareType: IOS
+
+    user_defined:
+      results:
+        - item:
+            id: 1234-5
+          json:
+            response:
+              - name: ansible_osx
+                value: IOS-XE
   tasks:
-    - name: Get Network Devices
-      cisco.dnac.network_device_info:
-        dnac_host: "{{ dnac_host }}"
-        dnac_username: "{{ dnac_username }}"
-        dnac_password: "{{ dnac_password }}"
-        dnac_verify: "{{ dnac_verify }}"
-        dnac_port: "{{ dnac_port }}"
-        dnac_version: "{{ dnac_version }}"
-        dnac_debug: "{{ dnac_debug }}"
-      register: network_devices_result
+    - ansible.builtin.set_fact: 
+        user_defined_dict: "{{ user_defined_dict | default([]) }} + [{{ { 'id': item.item.id } | combine( item.json.response | items2dict(key_name='name',value_name='value')) }} ]"
+      loop: "{{ user_defined.results }}"
 
-    - name: Ensure inventory exists
-      ansible.controller.inventory:
-        name: "{{ inventory_name }}"
-        organization: "{{ organization_name }}"
-        state: present
-      register: controller_inventory
+    - ansible.builtin.set_fact:
+        complete_network_devices: "{{ complete_network_devices | default([]) }} + [{{ item | combine({'site_code': (item.hostname | regex_search('.{1}(.{3}).*', '\\1') | first)}) | combine( user_defined_dict | selectattr('id','equalto',item.id) | first | default({})) }}]"
+      loop: "{{ network_devices }}"
 
-    - name: Delete missing hosts from network_devices_result if selected
-      block:
-        - name: Gather all hosts in inventory
-          set_fact:
-            inv_hosts:  >-
-              {{ query(
-                  'ansible.controller.controller_api',
-                  'hosts',
-                  query_params={ 'inventory__exact' : controller_inventory.id, },
-                ) | map(attribute='name') | list }}
-        
-        - name: Remove host from Controller if it is not in network_devices_result
-          ansible.controller.host:
-            name: "{{ item.name }}"
-            inventory: "{{ inventory_name }}"
-            state: absent
-          when: item.name not in network_devices_result.dnac_response|map(attribute="name")|list
-          loop: "{{ inv_hosts }}"
-      when: delete_missing_devices == true
+    - ansible.controller.import:
+        assets: "{{ (lookup('ansible.builtin.template', './inventory.j2') | from_json()) }}"
 
-    - name: Add all items from network_devices_result to Controller Inventory
-      ansible.controller.host:
-        name: "{{ item.name }}"
+    - name: Add hosts to groups
+      ansible.controller.group:
+        name: "site_code_{{ item }}"
         inventory: "{{ inventory_name }}"
-        state: present
-        variables:
-          location: "{{ item.location }}"
-      loop: "{{ network_devices_result.dnac_response }}"
+        hosts: "{{ complete_network_devices | selectattr('site_code', 'defined') | selectattr('site_code', 'equalto', item) | map(attribute='hostname') | list }}"
+      loop: "{{ complete_network_devices | selectattr('site_code', 'defined') | map(attribute='site_code') | list | unique }}"
