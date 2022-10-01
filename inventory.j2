@@ -1,0 +1,60 @@
+{
+    "inventory": [
+        {
+            "description": "",
+            "host_filter": null,
+            "kind": "",
+            "name": "{{ inventory_name }}",
+            "natural_key": {
+                "name": "{{ inventory_name }}",
+                "organization": {
+                    "name": "{{ organization_name }}",
+                    "type": "organization"
+                },
+                "type": "inventory"
+            },
+            "organization": {
+                "name": "{{ organization_name }}",
+                "type": "organization"
+            },
+            "related": {
+                "hosts": [
+                    {% for device in complete_network_devices %}
+                    {
+                        "description": "",
+                        "enabled": true,
+                        "instance_id": "",
+                        "inventory": {
+                            "name": "{{ inventory_name }}",
+                            "organization": {
+                                "name": "{{ organization_name }}",
+                                "type": "organization"
+                            },
+                            "type": "inventory"
+                        },
+                        "name": "{{ device.hostname }}",
+                        "natural_key": {
+                            "inventory": {
+                                "name": "{{ inventory_name }}",
+                                "organization": {
+                                    "name": "{{ organization_name }}",
+                                    "type": "organization"
+                                },
+                                "type": "inventory"
+                            },
+                            "name": "{{ device.hostname }}",
+                            "type": "host"
+                        },
+                        "related": {
+                            "groups": []
+                        },
+                        "variables": "{{ device | to_nice_yaml | replace('\n', '\\n') }}ansible_network_os: {% if device.softwareType == 'IOS-XE' or device.softwareType == 'IOS' %}cisco.ios.ios{% elif device.softwareType == 'NX-OS' %}cisco.nxos.nxos{% endif %}\n"
+                    }{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                "groups": []
+            },
+            "variables": "---"
+        }
+    ]
+}
