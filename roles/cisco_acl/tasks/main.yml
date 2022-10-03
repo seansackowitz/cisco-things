@@ -1,10 +1,28 @@
-- name: Clear acl
-  cisco.ios.ios_config:
-    lines:
-      - no ip access-list extended MYLIST<-AL
-    save_when: always
+- name: Restore startup to running on failure
+  cisco.ios.ios_command:
+    commands:
+      - command: 'copy running-config flash:acl_backup'
+        prompt: 'Destination filename'
+        answer: "\r"
 
-- name: Update all acls
-  cisco.ios.ios_config:
-    src: acl.j2
-    save_when: always
+- block:
+    - name: Clear acl
+      cisco.ios.ios_config:
+        lines:
+          - no ip access-list extended MYLIST<-AL
+
+    - name: Update all acls
+      cisco.ios.ios_config:
+        src: acl.j2
+        save_when: changed
+      vars:
+        ansible_command_timeout: 300
+  rescue:
+    - name: Restore startup to running on failure
+      cisco.ios.ios_command:
+        commands:
+          - command: 'copy flash:acl_backup running-config'
+            prompt: 'Destination filename'
+            answer: "\r"
+      vars:
+        ansible_command_timeout: 300
