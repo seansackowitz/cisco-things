@@ -1,0 +1,67 @@
+---
+- hosts: all
+  connection: local
+  collections:
+    - vmware.vmware_rest
+  vars:
+    vcenter_config_parent_folder: RTLab
+    vcenter_config_cluster: RTLocal
+    vcenter_config_datastore: vsanDatastore
+    vcenter_config_template: RHEL8_Gold
+    vm_vars: |-
+      - name: aap-controller-test
+        cpu: 2
+        mem: 8
+      - name: aap-hub-test
+        cpu: 2
+        mem: 8
+      - name: aap-db-test
+        cpu: 2
+        mem: 8
+  tasks:
+    - name: Gather Cluster id
+      vmware.vmware_rest.vcenter_cluster_info:
+        filter_names:
+          - "{{ vcenter_config_cluster }}"
+      register: cluster_id
+
+    - name: Gather Datastore id
+      vmware.vmware_rest.vcenter_datastore_info:
+        filter_names:
+          - "{{ vcenter_config_datastore }}"
+      register: datastore_id
+
+    - name: Gather Template VM id
+      vmware.vmware_rest.vcenter_vm_info:
+        filter_names:
+          - "{{ vcenter_config_template }}"
+      register: template_vm
+
+    - set_fact:
+        vm_folder: "{{ vcenter_config_parent_folder }}"
+
+    - name: Gather Folder id
+      vmware.vmware_rest.vcenter_folder_info:
+        filter_names:
+          - "{{ vcenter_config_parent_folder }}"
+      register: vm_folder_id
+      when: vcenter_config_parent_folder is defined
+
+    - name: Create all VMs
+      vmware.vmware_rest.vcenter_vm:
+        placement:
+          cluster: "{{ cluster_id.value[0].cluster }}"
+          folder: "{% if vcenter_config_parent_folder %}{{ vm_folder_id.value[0].folder }}{% else %}{{ omit }}{% endif %}"
+          datastore: "{{ datastore_id.value[0].datastore }}"
+        source: "{{ template_vm.value[0].vm }}"
+        memory:
+          size_MiB: "{{ item.mem * 1024 | int }}"
+        cpu:
+          count: "{{ item.cpu | int }}"
+        guest_customization_spec:
+          name: "RHEL8"
+        guest_OS: RHEL_8_64
+        name: "{{ item.name }}"
+        state: clone
+        power_on: yes
+      loop: "{{ vm_vars | from_yaml }}"
